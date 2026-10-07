@@ -1,0 +1,1158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Animated explainer of Cashu Layer 3: PS-credential ecash on a held Lightning HTLC. How it works, what works, what needs work.">
+<meta property="og:title" content="Cashu Layer 3">
+<meta property="og:description" content="Animated explainer of Cashu Layer 3: PS-credential ecash on a held Lightning HTLC. How it works, what works, what needs work.">
+<meta name="theme-color" content="#000000">
+<title>Cashu Layer 3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Silkscreen:wght@400;700&display=swap">
+<style>
+/* Layout: one 1120px column of TUI panes on pure black; every canvas renders at 1/2–1/3 res and is upscaled pixelated */
+:root{
+  --bg:#000;
+  --fg:#f4f4f4;
+  --dim:#a3a3a3;
+  --mute:#6b6b6b;
+  --line:#3d3d3d;
+  --faint:#141414;
+  --display:"Silkscreen","Courier New",monospace;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{background:var(--bg);color:var(--fg);font:14px/1.65 var(--mono);-webkit-font-smoothing:antialiased}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.026) 0 1px,transparent 1px 3px)}
+::selection{background:var(--fg);color:var(--bg)}
+a{color:var(--fg);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+a:hover{background:var(--fg);color:var(--bg);text-decoration:none}
+:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+canvas{display:block;width:100%;image-rendering:crisp-edges;image-rendering:pixelated}
+pre{margin:0;font:inherit;white-space:pre}
+code{font-family:var(--mono);font-size:.95em;color:var(--fg)}
+h1,h2,h3{font-family:var(--display);font-weight:400;text-wrap:balance;margin:0;letter-spacing:.02em}
+p{margin:0;max-width:68ch}
+
+.wrap{max-width:1120px;margin:0 auto;padding-inline:16px}
+
+/* status bar */
+.bar{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;padding-block:12px;border-bottom:1px solid var(--line);
+  font-size:12px;line-height:1.5;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.bar .inv{background:var(--fg);color:var(--bg);padding:1px 7px;font-family:var(--display);letter-spacing:.04em}
+.bar .sp{flex:1}
+
+/* boxes: a label sits on the top border, so every box gets top padding >= 22px */
+.box{position:relative;border:1px solid var(--fg);background:var(--bg)}
+.box>.lbl{position:absolute;top:0;left:12px;transform:translateY(-50%);background:var(--bg);padding:0 7px;font-family:var(--display);font-size:11px;
+  letter-spacing:.08em;line-height:1.3;color:var(--fg);white-space:nowrap;max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis}
+
+/* hero */
+.hero{position:relative;border-bottom:1px solid var(--line);overflow:hidden}
+.hero canvas{position:absolute;inset:0;height:100%}
+.hero-in{position:relative;padding-block:56px 52px;display:grid;grid-template-columns:minmax(0,1fr);gap:32px;pointer-events:none}
+.hero-pane{pointer-events:auto;max-width:640px;min-width:0;padding:32px 28px 28px}
+.eyebrow{font-size:12px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin-bottom:18px}
+h1{font-size:clamp(42px,9vw,92px);line-height:.95;font-weight:700;letter-spacing:0}
+h1 .cur{display:inline-block;width:.5em;height:.78em;background:var(--fg);vertical-align:-.02em;margin-left:.08em;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.lede{margin-top:22px;font-size:15px;line-height:1.7}
+.stack{pointer-events:auto;max-width:780px;min-width:0;padding:24px 0 6px}
+.stack .sc{overflow-x:auto;padding:0 20px 14px}
+.stack pre{font-size:12.5px;line-height:2;color:var(--dim)}
+.stack b{color:var(--fg);font-weight:500}
+.stack .k{font-family:var(--display);color:var(--bg);background:var(--fg);padding:0 5px;margin-right:12px}
+
+/* sections */
+section{padding-block:80px 0}
+.sec{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin-bottom:14px}
+.sec .tag{font-family:var(--display);font-size:12px;line-height:1.4;letter-spacing:.08em;background:var(--fg);color:var(--bg);padding:3px 9px}
+.sec h2{font-size:clamp(20px,3vw,28px);line-height:1.25}
+.intro{color:var(--dim);margin-bottom:36px}
+
+/* simulator */
+.sim{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr);gap:28px;align-items:stretch}
+.stage{padding:24px 16px 16px;min-width:0}
+#flowCv{aspect-ratio:16/10}
+.ctrl{display:grid;gap:12px;margin-top:14px}
+.pips{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;list-style:none;margin:0;padding:0}
+.pip{position:relative;width:100%;font:10px/1 var(--display);letter-spacing:.04em;background:var(--bg);color:var(--mute);border:1px solid var(--line);padding:10px 4px;cursor:pointer;overflow:hidden;white-space:nowrap;text-align:center}
+.pip span{position:relative;z-index:1}
+.pip::before{content:"";position:absolute;inset:0;background:var(--fg);transform-origin:left;transform:scaleX(var(--p,0))}
+.pip[aria-current="step"]{color:var(--fg);border-color:var(--fg)}
+.pip[aria-current="step"] span{mix-blend-mode:difference;color:var(--fg)}
+.pip.done{color:var(--dim);border-color:var(--mute)}
+.pip:hover{border-color:var(--fg);color:var(--fg)}
+.btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{font:11px/1 var(--display);letter-spacing:.06em;background:var(--bg);color:var(--fg);border:1px solid var(--fg);padding:9px 12px;cursor:pointer}
+.btn:hover{background:var(--fg);color:var(--bg)}
+.hint{margin-left:auto;font-size:11px;color:var(--mute)}
+
+.side{padding:30px 22px 22px;display:flex;flex-direction:column;gap:18px;min-width:0}
+.side h3{font-size:17px;line-height:1.35}
+.side p{font-size:13px;line-height:1.7;color:var(--dim)}
+.eq{font-size:12px;line-height:1.8;padding:12px 14px;background:var(--faint);border-left:2px solid var(--fg);white-space:pre-wrap;overflow-wrap:anywhere}
+.mv-h{font:10px/1.3 var(--display);letter-spacing:.1em;color:var(--dim);margin-bottom:10px}
+.mv{list-style:none;margin:0;padding:0;font-size:12px;display:grid;gap:4px}
+.mv li{display:grid;grid-template-columns:2.6em 7.6em minmax(0,1fr);gap:8px;align-items:baseline}
+.mv .f{font-weight:700}
+.mv .d{color:var(--mute)}
+.mv .on{color:var(--fg);overflow-wrap:anywhere}
+.mv .on::before{content:"■ "}
+.mv .off{color:var(--mute)}
+.mv .off::before{content:"░░░ "}
+.mv .na{color:#3a3a3a}
+
+/* token */
+.tokgrid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:36px;align-items:start}
+.tok{padding:30px 18px 20px;min-width:0}
+.tok dl{margin:0;display:grid;gap:4px;font-size:12.5px}
+.tok .row{display:grid;grid-template-columns:10.5em minmax(0,1fr) auto;gap:12px;align-items:baseline;padding:5px 8px}
+.tok dt{color:var(--dim)}
+.tok dd{margin:0;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.tok .note{font:9px/1.3 var(--display);letter-spacing:.06em;color:var(--mute);white-space:nowrap}
+.tok .row.keep .note{color:var(--fg)}
+.flash{animation:flash .7s steps(6) 1}
+@keyframes flash{0%{background:var(--fg);color:var(--bg)}100%{background:transparent;color:var(--fg)}}
+.chain{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:20px;padding-inline:8px;font:10px/1 var(--display);letter-spacing:.06em;color:var(--mute)}
+.chain .n{border:1px solid var(--line);padding:7px 8px}
+.chain .n.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chain .n.past{color:var(--dim);border-color:var(--mute)}
+.chain .ar{font-family:var(--mono);color:var(--mute)}
+.tok.burned .row:not(.pre){opacity:.35}
+.tok.burned .row.pre{background:var(--fg);color:var(--bg)}
+.tok.burned .row.pre dt,.tok.burned .row.pre .note{color:var(--bg)}
+.prose{display:grid;gap:16px;color:var(--dim);font-size:13.5px;min-width:0}
+.prose b{color:var(--fg);font-weight:500}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl th,.tbl td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl th{font:10px/1.4 var(--display);letter-spacing:.08em;color:var(--dim);font-weight:400}
+.scroll{overflow-x:auto}
+
+/* crypto */
+.cgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:30px 24px}
+.cbox{padding:30px 20px 18px;min-width:0}
+.cbox .sc{overflow-x:auto;padding-bottom:4px}
+.cbox pre{font-size:12.5px;line-height:1.8}
+.cbox p{margin-top:14px;font-size:12.5px;color:var(--dim)}
+.cbox.wide{grid-column:1/-1}
+.c-dim{color:var(--mute)}
+
+/* privacy matrix */
+.mx td.c,.mx th.c{text-align:center;width:17%;white-space:nowrap}
+.mx .s{color:var(--fg)}
+.mx .h{color:var(--mute)}
+.mx .x{color:#3a3a3a}
+.mx tr.link td{background:var(--fg);color:var(--bg)}
+.mx tr.link td .s,.mx tr.link td .h{color:var(--bg)}
+.mxnote{margin-top:18px;color:var(--dim);font-size:13px}
+.mxnote b{color:var(--fg);font-weight:500}
+
+/* mini visualizations */
+.viz{height:112px;background:var(--bg)}
+
+/* works */
+.good{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.card{border:1px solid var(--line);display:flex;flex-direction:column;min-width:0;transition:border-color .2s}
+.card:hover{border-color:var(--fg)}
+.card .viz{border-bottom:1px solid var(--line)}
+.card .cb{padding:16px 18px 18px;display:flex;flex-direction:column;gap:8px}
+.card h3{font-size:13px;line-height:1.4;display:flex;gap:10px;align-items:baseline}
+.card h3 .m{font-family:var(--mono);font-weight:700;color:var(--bg);background:var(--fg);padding:0 5px;font-size:11px;line-height:1.5;flex:none}
+.card p{font-size:12.5px;color:var(--dim);line-height:1.65}
+.span2{grid-column:span 2}
+.span2-wide{grid-column:span 2}
+
+/* needs work */
+.issues{display:grid;border-top:1px solid var(--line)}
+.issue{display:grid;grid-template-columns:96px minmax(0,1fr) minmax(0,330px);gap:24px;padding:24px 0;border-bottom:1px solid var(--line);align-items:start}
+.sev{font:10px/1 var(--display);letter-spacing:.06em;padding:7px 6px;border:1px solid var(--fg);text-align:center;white-space:nowrap}
+.sev.crit{background:var(--fg);color:var(--bg)}
+.sev.low{border-color:var(--mute);color:var(--dim)}
+.issue h3{font-size:15px;line-height:1.4;margin-bottom:8px}
+.issue p{font-size:13px;color:var(--dim)}
+.issue p+p{margin-top:8px}
+.issue .dir{font-size:12.5px;color:var(--fg)}
+.issue .dir::before{content:"→ ";color:var(--mute)}
+.iv{border:1px solid var(--line);min-width:0}
+.iv .viz{height:128px}
+.vcap{border-top:1px solid var(--line);padding:8px 10px;font:9px/1.6 var(--display);letter-spacing:.05em;color:var(--dim);min-height:calc(2 * 1.6em + 16px)}
+.vcap .inv{background:var(--fg);color:var(--bg);padding:0 4px}
+
+footer{margin-top:88px;border-top:1px solid var(--line);padding-block:20px 40px;font-size:12px;color:var(--mute);display:flex;flex-wrap:wrap;gap:8px 24px}
+
+@media (max-width:980px){
+  .good{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .span2-wide{grid-column:auto}
+  .issue{grid-template-columns:96px minmax(0,1fr)}
+  .iv{grid-column:2}
+}
+@media (max-width:900px){
+  .sim,.tokgrid{grid-template-columns:minmax(0,1fr)}
+  .cgrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:620px){
+  .good{grid-template-columns:minmax(0,1fr)}
+  .span2{grid-column:auto}
+  .issue{grid-template-columns:minmax(0,1fr);gap:14px}
+  .iv{grid-column:auto}
+  .sev{justify-self:start}
+  .pips{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .hint{display:none}
+}
+@media (max-width:560px){
+  #flowCv{aspect-ratio:2/3}
+  .hero-pane{padding:28px 16px 20px}
+  .tok .row{grid-template-columns:minmax(0,1fr) auto;row-gap:2px}
+  .tok dd{grid-column:1/-1;grid-row:2}
+  .mv li{grid-template-columns:2.6em minmax(0,1fr)}
+  .mv .d{display:none}
+  .side{padding:28px 16px 18px}
+  .stage{padding:22px 10px 12px}
+}
+@media (prefers-reduced-motion:reduce){
+  h1 .cur{animation:none}
+  .flash{animation:none}
+}
+</style>
+<style>body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <div class="bar">
+    <span class="inv">CASHU-L3</span>
+    <span>a1denvalu3/cashu-layer3</span>
+    <span>18006bf · 2026-10-07</span>
+    <span class="sp"></span>
+    <span>python · bls12-381 · lnd hodl</span>
+    <span>experimental</span>
+  </div>
+</div>
+
+<header class="hero">
+  <canvas id="heroCv" aria-hidden="true"></canvas>
+  <div class="wrap hero-in">
+    <div class="box hero-pane">
+      <span class="lbl">README.MD</span>
+      <p class="eyebrow">Ecash on top of an unsettled HTLC</p>
+      <h1>CASHU<br>LAYER 3<span class="cur" aria-hidden="true"></span></h1>
+      <p class="lede">A Lightning payment to the mint is accepted and then held. While it sits pending, a Pointcheval–Sanders credential for the <em>whole</em> HTLC changes hands through private swaps. The last holder burns it to pay any invoice. Only then does the original payment settle.</p>
+    </div>
+    <div class="box stack">
+      <span class="lbl">STACK</span>
+      <div class="sc"><pre><span class="k">L3</span><b>PS credential</b>   alice ─▶ bob ─▶ carol      private swaps, no LN traffic
+<span class="k">L2</span><b>held HTLC    </b>   payer ═▶ hops ═▶ mint      ACCEPTED, unsettled, P unknown
+<span class="k">L1</span><b>bitcoin      </b>   channel outputs            CLTV bounds how long it can hold</pre></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section id="flow" aria-labelledby="flow-h">
+    <div class="sec"><span class="tag">FLOW</span><h2 id="flow-h">One HTLC, three holders, one settlement</h2></div>
+    <p class="intro">The regtest topology from the README: a payer funds the mint's hold invoice, the claim moves Alice → Bob → Carol by swap, and Carol burns it into an unrelated invoice. Step through it or let it loop.</p>
+
+    <div class="sim">
+      <div class="box stage">
+        <span class="lbl">SIM · LND-1 &gt; LND-3 &gt; LND-2</span>
+        <canvas id="flowCv" role="img" aria-label="Animated diagram of the Layer 3 flow: payer, routing hops, mint and payee on the Lightning row; Alice, Bob and Carol wallets below."></canvas>
+        <div class="ctrl">
+          <ol class="pips" id="pips"></ol>
+          <div class="btns">
+            <button class="btn" id="bPrev" type="button">PREV</button>
+            <button class="btn" id="bPlay" type="button">PAUSE</button>
+            <button class="btn" id="bNext" type="button">NEXT</button>
+            <span class="hint">← → to step</span>
+          </div>
+        </div>
+      </div>
+      <aside class="box side" aria-live="polite">
+        <span class="lbl" id="sideLbl">STEP 1/6</span>
+        <h3 id="sideTitle"></h3>
+        <p id="sideBody"></p>
+        <pre class="eq" id="sideEq"></pre>
+        <div>
+          <div class="mv-h">WHAT THE MINT LEARNS</div>
+          <ul class="mv" id="sideView"></ul>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <section id="token" aria-labelledby="tok-h">
+    <div class="sec"><span class="tag">TOKEN</span><h2 id="tok-h">Two secrets, different lifetimes</h2></div>
+    <p class="intro">A <code>cashuPS</code> bearer string carries the owner secret and the HTLC preimage. Each swap replaces one and preserves the other.</p>
+    <div class="tokgrid">
+      <div class="box tok" id="tok">
+        <span class="lbl">CASHUPS · V2 · 12,345 SAT</span>
+        <dl>
+          <div class="row keep"><dt>payment_hash H</dt><dd>9f2c4b07d1…e41a</dd><span class="note">FIXED</span></div>
+          <div class="row keep"><dt>amount</dt><dd>12345</dd><span class="note">FIXED</span></div>
+          <div class="row keep pre"><dt>preimage P</dt><dd>5d0e93c2aa…a7b3</dd><span class="note" id="tokPnote">FIXED · BEARER</span></div>
+          <div class="row"><dt>owner secret s</dt><dd id="tS">—</dd><span class="note">NEW PER SWAP</span></div>
+          <div class="row"><dt>credential (u,v)</dt><dd id="tUV">—</dd><span class="note">NEW PER SWAP</span></div>
+          <div class="row"><dt>nullifier s·G_NULL</dt><dd id="tN">—</dd><span class="note">FROM s</span></div>
+        </dl>
+        <div class="chain" id="tokChain" aria-hidden="true"></div>
+      </div>
+      <div class="prose">
+        <p><b>Owner secret s</b> authorizes spending. Its nullifier <code>N = s·G_NULL</code> is what the mint marks spent, so the receiver must swap before the token is theirs: the sender still knows the old s until its N is burned.</p>
+        <p><b>Preimage P</b> is not a swap witness and is never sent in a swap request. It rides along as bearer data so whoever finally burns can hand it to the mint, which needs it to settle the held payment.</p>
+        <p><b>Consequence:</b> every past holder knows P. That is harmless only because settlement also requires a valid, unspent credential, and the mint is the only party that can use P against the hold.</p>
+        <div class="scroll">
+          <table class="tbl">
+            <thead><tr><th>SECRET</th><th>PURPOSE</th><th>ON SWAP</th></tr></thead>
+            <tbody>
+              <tr><td>s</td><td>spend auth, nullifier</td><td>replaced (s → s′)</td></tr>
+              <tr><td>P</td><td>settles the hold at burn</td><td>copied verbatim</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="crypto" aria-labelledby="cr-h">
+    <div class="sec"><span class="tag">CRYPTO</span><h2 id="cr-h">PS credentials over BLS12-381</h2></div>
+    <p class="intro">Scalars mod q, the BLS12-381 group order. Mint key <code>(x, y_h, y_s)</code>, a single key for every amount. Primitives were extracted from cashu-nft and adapted; signing of committed messages follows §6.1 of <a href="https://eprint.iacr.org/2020/450.pdf">The Landscape of Pointcheval–Sanders Signatures</a>.</p>
+    <div class="cgrid">
+      <div class="box cbox"><span class="lbl">ISSUE · PUBLIC, AFTER ACCEPTED</span>
+<div class="sc"><pre>H = SHA256(P)
+h = SHA256(dom ‖ amt_be64 ‖ H) mod q
+C = s·G1                     + PoK(s)
+u = k·G1                     k fresh, secret
+v = k·[(x + y_h·h)·G1 + y_s·C]</pre></div>
+        <p>The mint computes h from the funded quote, so the client cannot pick an amount. <code>dom = "Cashu_PS_HTLC_Claim_v2"</code>.</p>
+      </div>
+      <div class="box cbox"><span class="lbl">WHY K MUST BE FRESH</span>
+<div class="sc"><pre><span class="c-dim">with u = G1:</span>
+  v* = v + (h* − h)·Y_h1      <span class="c-dim">any claim</span>
+<span class="c-dim">with u = k·G1:</span>
+  need y_h·u = k·Y_h1         <span class="c-dim">CDH in G1</span></pre></div>
+        <p>A fixed base turns the public <code>Y_h1</code> into an attribute-rewrite oracle. Mint-chosen k closes it; later rerandomization by the client gives privacy.</p>
+      </div>
+      <div class="box cbox"><span class="lbl">SPEND · PRIVATE SWAP REQUEST</span>
+<div class="sc"><pre>u′  = ρ·u            v″ = ρ·v + o·u′
+κ_h = h·Y_h2 + o·G2  U_s = s·u′
+N   = s·G_NULL       B  = h·Y_h1 + t·G1
+
+e(v″, G2) = e(u′, X2 + κ_h) · e(U_s, Y_s2)
+
+π_own: U_s = s·u′        ∧ N = s·G_NULL
+π_eq : κ_h = h·Y_h2+o·G2 ∧ B = h·Y_h1+t·G1</pre></div>
+        <p>Both proofs bind <code>C_new = s′·G1</code>, which carries its own PoK. h is shown equal across G2 (κ_h) and G1 (B) without being revealed. N is invariant under ρ and o, so rerandomizing cannot dodge the spent set.</p>
+      </div>
+      <div class="box cbox"><span class="lbl">REISSUE · ONE ROUND TRIP</span>
+<div class="sc"><pre>U     = k·G1
+V_raw = k·[x·G1 + B + y_s·C_new]
+V     = V_raw − t·U
+      = k·[(x + y_h·h)·G1 + y_s·C_new]
+      → σ(h, s′)</pre></div>
+        <p>The mint consumes N and returns <code>(U, V_raw)</code> in the same <code>POST /v1/swap</code> response. The client strips t. The earlier two-round flow, which first fetched a signing base, survives only for recovering saved requests.</p>
+      </div>
+      <div class="box cbox wide"><span class="lbl">BURN · PUBLIC h</span>
+<div class="sc"><pre>req   = { amount, presentation(h, N, π ⟂ amount ‖ invoice), invoice, P }
+check   SHA256(P) = H,  h = SHA256(dom ‖ amount ‖ H),  invoice.amount = amount
+reserve N, H, payout_hash              <span class="c-dim">one sqlite txn</span>
+pay(invoice) → P′,  SHA256(P′) = H′    <span class="c-dim">mint fronts liquidity + fees</span>
+persist receipt  →  settle(P)          <span class="c-dim">crash-safe, no double payout</span></pre></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="privacy" aria-labelledby="pv-h">
+    <div class="sec"><span class="tag">LEDGER</span><h2 id="pv-h">What the mint sees, per phase</h2></div>
+    <p class="intro">Swaps are blind. The two ends are not.</p>
+    <div class="scroll">
+      <table class="tbl mx">
+        <thead><tr><th>FIELD</th><th class="c">ISSUE</th><th class="c">SWAP × N</th><th class="c">BURN</th></tr></thead>
+        <tbody>
+          <tr class="link"><td>backing hash H</td><td class="c"><span class="s">■</span></td><td class="c"><span class="h">░</span></td><td class="c"><span class="s">■</span></td></tr>
+          <tr class="link"><td>amount</td><td class="c"><span class="s">■</span></td><td class="c"><span class="h">░</span></td><td class="c"><span class="s">■</span></td></tr>
+          <tr><td>claim attribute h</td><td class="c"><span class="s">■</span></td><td class="c"><span class="h">░</span> κ_h, B</td><td class="c"><span class="s">■</span></td></tr>
+          <tr><td>owner commitment</td><td class="c"><span class="s">■</span> C</td><td class="c"><span class="s">■</span> C′ fresh</td><td class="c"><span class="x">·</span></td></tr>
+          <tr><td>credential</td><td class="c"><span class="s">■</span> (u,v)</td><td class="c"><span class="s">■</span> rerandomized</td><td class="c"><span class="s">■</span> rerandomized</td></tr>
+          <tr><td>nullifier N</td><td class="c"><span class="x">·</span></td><td class="c"><span class="s">■</span></td><td class="c"><span class="s">■</span></td></tr>
+          <tr><td>preimage P</td><td class="c"><span class="h">░</span></td><td class="c"><span class="h">░</span></td><td class="c"><span class="s">■</span></td></tr>
+          <tr><td>payout invoice</td><td class="c"><span class="x">·</span></td><td class="c"><span class="x">·</span></td><td class="c"><span class="s">■</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="mxnote"><b>■ seen &nbsp; ░ hidden &nbsp; · not involved.</b> The inverted rows show the link: H and amount appear at issuance and again at burn, so the mint maps each funding payment to its payout invoice one to one. The swaps hide who held the claim in between and how many times it moved. They hide neither end.</p>
+  </section>
+
+  <section id="works" aria-labelledby="ok-h">
+    <div class="sec"><span class="tag">WORKS</span><h2 id="ok-h">What the design gets right</h2></div>
+    <p class="intro">Seven properties that hold in the current code.</p>
+    <div class="good">
+      <div class="card span2"><canvas class="viz" data-viz="custody" aria-hidden="true"></canvas><div class="cb"><h3><span class="m">+</span>Custody shrinks to the burn</h3><p>Until a burn, the mint holds an accepted HTLC it cannot settle: P only arrives inside a burn request. It can refuse service or cancel, which refunds the payer, but it cannot pocket the sats while tokens circulate. Classic ecash puts the mint in custody from deposit to withdrawal.</p></div></div>
+      <div class="card"><canvas class="viz" data-viz="zeroln" aria-hidden="true"></canvas><div class="cb"><h3><span class="m">+</span>Transfers cost zero Lightning</h3><p>n swaps add no HTLCs, no routing fees, no liquidity movement. One <code>POST /v1/swap</code>, one round trip.</p></div></div>
+      <div class="card"><canvas class="viz" data-viz="shell" aria-hidden="true"></canvas><div class="cb"><h3><span class="m">+</span>Swaps hide the claim</h3><p>Rerandomized PS plus a blinded h, under one key for all amounts. A swap reveals neither H nor amount, so its anonymity set is every live claim.</p></div></div>
+      <div class="card"><canvas class="viz" data-viz="nullifier" aria-hidden="true"></canvas><div class="cb"><h3><span class="m">+</span>Double-spend check holds</h3><p><code>N = s·G_NULL</code> depends only on s, so two rerandomizations of one credential carry the same N. It is consumed in the same DB transaction that issues the replacement.</p></div></div>
+      <div class="card"><canvas class="viz" data-viz="forgery" aria-hidden="true"></canvas><div class="cb"><h3><span class="m">+</span>Known forgery paths closed</h3><p>Fresh k defeats the fixed-base attribute shift. Amount and H are hashed into h, so relabeling breaks the pairing. The burn proof binds amount and invoice.</p></div></div>
+      <div class="card"><canvas class="viz" data-viz="anyinv" aria-hidden="true"></canvas><div class="cb"><h3><span class="m">+</span>Pays any invoice</h3><p>The payout hash is independent of H. The final receiver runs a stock Lightning node and never learns Layer 3 exists.</p></div></div>
+      <div class="card span2-wide"><canvas class="viz" data-viz="outbox" aria-hidden="true"></canvas><div class="cb"><h3><span class="m">+</span>Crash-safe redemption</h3><p>Burn is an outbox: reserve, pay, verify the payout preimage, persist the receipt, settle. A restart reconciles against the node's payment record instead of paying again. Exact retries return the original receipt, and only a definite payout failure releases the token. Exercised against LND regtest.</p></div></div>
+    </div>
+  </section>
+
+  <section id="todo" aria-labelledby="todo-h">
+    <div class="sec"><span class="tag">NEEDS WORK</span><h2 id="todo-h">Where it breaks or leaks</h2></div>
+    <p class="intro">Ordered by how much they limit the scheme, not by how hard they are to fix.</p>
+
+    <div class="issues">
+      <div class="issue"><span class="sev crit">CRITICAL</span><div>
+        <h3>Expiry is invisible</h3>
+        <p>A token is only worth something until the backing HTLC's CLTV runs out, minus the node's cancel margin. The mint does not set <code>cltv_expiry</code>, so this is LND's default final delta: hours to about a day, not weeks. The deadline is not in the token and not a signed attribute. The swap cannot check it because the mint never sees h, and a receiver can only check liveness by revealing H. A dead token swaps successfully.</p>
+        <p class="dir">Sign an expiry epoch as a third attribute and prove it is in range at swap, or publish per-epoch sets of live claims and prove membership.</p>
+      </div><div class="iv"><canvas class="viz" data-viz="expiry" aria-hidden="true"></canvas><div class="vcap" id="expCap">ALICE · HTLC HELD · BACKED</div></div></div>
+
+      <div class="issue"><span class="sev crit">CRITICAL</span><div>
+        <h3>Every token is a held HTLC on other people's channels</h3>
+        <p>Each hop from payer to mint locks liquidity and one of its 483 HTLC slots for the token's whole life. To routing nodes that is indistinguishable from slow jamming, and hold fees or reputation schemes would price it out or filter it. L3 capacity is capped by how many long-held HTLCs the network tolerates.</p>
+        <p class="dir">Fund via the mint's own channel or an LSP that accepts the hold explicitly; budget a hold fee into the quote.</p>
+      </div><div class="iv"><canvas class="viz" data-viz="jam" aria-hidden="true"></canvas><div class="vcap" id="jamCap">ONE HOP · EACH TOKEN PINS A SLOT</div></div></div>
+
+      <div class="issue"><span class="sev">HIGH</span><div>
+        <h3>The burn is custodial at the critical moment</h3>
+        <p>The mint receives P before it pays the payout invoice, so it can settle the hold and not pay. The earlier same-hash burn was atomic like a routing hop, but required the payee to know P. Separately, the mint can cancel the hold at any time. With the original payer as an accomplice, that is a clean double-spend against the current holder.</p>
+        <p class="dir">Make the payout path release P only on proof of payout (PTLC or adaptor signature) once Lightning supports it; until then treat the mint as a custodian at burn.</p>
+      </div><div class="iv"><canvas class="viz" data-viz="trust" aria-hidden="true"></canvas><div class="vcap" id="trustCap">P REACHES THE MINT FIRST</div></div></div>
+
+      <div class="issue"><span class="sev">HIGH</span><div>
+        <h3>The endpoints are linked</h3>
+        <p>Issuance reveals H, amount and C. Burn reveals H, h, amount and P. The mint maps every funding payment to its payout invoice exactly. Whole-claim amounts are often unique, which makes timing and amount correlation trivial.</p>
+        <p class="dir">Burn with h hidden and prove SHA256(P) consistency in ZK, or settle through a batched or delayed path that breaks the 1:1 mapping.</p>
+      </div><div class="iv"><canvas class="viz" data-viz="linked" aria-hidden="true"></canvas><div class="vcap">SWAPS ARE FOG · BOTH ENDS SHOW H</div></div></div>
+
+      <div class="issue"><span class="sev">MEDIUM</span><div>
+        <h3>Whole claims only</h3>
+        <p>No split, merge or change. A 12,345-sat token pays exactly a 12,345-sat invoice. Routing fees on the payout are absorbed by the mint up to <code>fee_limit_sat</code>; the protocol has no fee field and no revenue model for the liquidity the mint fronts.</p>
+        <p class="dir">Move the amount into a committed attribute with range proofs so one claim can fan out into several credentials.</p>
+      </div><div class="iv"><canvas class="viz" data-viz="whole" aria-hidden="true"></canvas><div class="vcap">TOKEN AMOUNT MUST EQUAL INVOICE</div></div></div>
+
+      <div class="issue"><span class="sev low">PROTOTYPE</span><div>
+        <h3>Not production code yet</h3>
+        <p>One commit, about 5k lines of Python and 64 tests. The adapted PS construction and Σ-proofs are unaudited. The <code>cashuPS</code> token is not NUT-compatible, so ordinary Cashu wallets cannot read it. One server process per database. The mint needs outbound liquidity to front every payout.</p>
+      </div><div class="iv"><canvas class="viz" data-viz="proto" aria-hidden="true"></canvas><div class="vcap">64 TESTS · 1 COMMIT · 0 AUDITS</div></div></div>
+    </div>
+  </section>
+
+</main>
+
+<div class="wrap">
+  <footer>
+    <span>Source: <a href="https://github.com/a1denvalu3/cashu-layer3">github.com/a1denvalu3/cashu-layer3</a> @ 18006bf</span>
+    <span>Example hashes and secrets on this page are illustrative.</span>
+  </footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const FG="#f4f4f4",DIM="#a3a3a3",MUTE="#6b6b6b",LINE="#3d3d3d";
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const clamp=(v,a,b)=>Math.max(a===undefined?0:a,Math.min(b===undefined?1:b,v));
+const ease=s=>s<.5?2*s*s:1-2*(1-s)*(1-s);
+const lerp=(a,b,s)=>a+(b-a)*s;
+const FONT='8px Silkscreen, "Courier New", monospace';
+
+/* ---------- pixel-exact primitives ---------- */
+function line(ctx,x0,y0,x1,y1,c,dash,off,glowOn){
+  x0=Math.round(x0);y0=Math.round(y0);x1=Math.round(x1);y1=Math.round(y1);
+  const dx=Math.abs(x1-x0),dy=-Math.abs(y1-y0),sx=x0<x1?1:-1,sy=y0<y1?1:-1;
+  let err=dx+dy,i=0;const pts=[];const per=dash?dash[0]+dash[1]:0;off=Math.floor(off||0);
+  for(;;){
+    if(!dash||(((i+off)%per)+per)%per<dash[0])pts.push(x0,y0);
+    if(x0===x1&&y0===y1)break;
+    const e2=2*err;if(e2>=dy){err+=dy;x0+=sx}if(e2<=dx){err+=dx;y0+=sy}i++;
+  }
+  if(glowOn){ctx.fillStyle="rgba(244,244,244,.075)";for(let k=0;k<pts.length;k+=2)ctx.fillRect(pts[k]-1,pts[k+1]-1,3,3)}
+  ctx.fillStyle=c;for(let k=0;k<pts.length;k+=2)ctx.fillRect(pts[k],pts[k+1],1,1);
+}
+function rect(ctx,x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h))}
+function orect(ctx,x,y,w,h,c){x=Math.round(x);y=Math.round(y);w=Math.round(w);h=Math.round(h);ctx.fillStyle=c;ctx.fillRect(x,y,w,1);ctx.fillRect(x,y+h-1,w,1);ctx.fillRect(x,y,1,h);ctx.fillRect(x+w-1,y,1,h)}
+function halo(ctx,x,y,w,h,a){ctx.fillStyle="rgba(244,244,244,"+(a||.14)+")";ctx.fillRect(Math.round(x)-1,Math.round(y)-1,Math.round(w)+2,Math.round(h)+2)}
+function pdia(ctx,x,y,r,c,fill){x=Math.round(x);y=Math.round(y);ctx.fillStyle=c;for(let dy=-r;dy<=r;dy++){const w=r-Math.abs(dy);if(fill)ctx.fillRect(x-w,y+dy,2*w+1,1);else{ctx.fillRect(x-w,y+dy,1,1);ctx.fillRect(x+w,y+dy,1,1)}}}
+function pcirc(ctx,x,y,r,c,fill){x=Math.round(x);y=Math.round(y);ctx.fillStyle=c;for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){const d=Math.hypot(dx,dy);if(fill?d<=r+.35:Math.abs(d-r)<.5)ctx.fillRect(x+dx,y+dy,1,1)}}
+function ptri(ctx,x,y,r,c,dir,fill){ // dir: "r" right, "d" down, "l" left
+  x=Math.round(x);y=Math.round(y);
+  for(let i=0;i<=2*r;i++){
+    const half=Math.round(r*(1-i/(2*r)));
+    for(let j=-half;j<=half;j++){
+      const edge=i===0||Math.abs(j)===half;
+      if(!edge&&!fill)continue;
+      ctx.fillStyle=edge?c:fill;
+      if(dir==="d")ctx.fillRect(x+j,y-r+i,1,1);
+      else if(dir==="l")ctx.fillRect(x+r-i,y+j,1,1);
+      else ctx.fillRect(x-r+i,y+j,1,1);
+    }
+  }
+}
+function poly(ctx,x,y,r,n,rot){ctx.beginPath();for(let i=0;i<n;i++){const a=rot+i*Math.PI*2/n,px=x+Math.cos(a)*r,py=y+Math.sin(a)*r;i?ctx.lineTo(px,py):ctx.moveTo(px,py)}ctx.closePath()}
+function glow(ctx,blur,fn){ctx.save();ctx.shadowColor="rgba(244,244,244,.9)";ctx.shadowBlur=blur;fn();ctx.restore()}
+function vignette(ctx,W,H,m){
+  const mk=(x0,y0,x1,y1)=>{const g=ctx.createLinearGradient(x0,y0,x1,y1);g.addColorStop(0,"#000");g.addColorStop(1,"rgba(0,0,0,0)");return g};
+  ctx.fillStyle=mk(0,0,0,m);ctx.fillRect(0,0,W,m);
+  ctx.fillStyle=mk(0,H,0,H-m);ctx.fillRect(0,H-m,W,m);
+  ctx.fillStyle=mk(0,0,m,0);ctx.fillRect(0,0,m,H);
+  ctx.fillStyle=mk(W,0,W-m,0);ctx.fillRect(W-m,0,m,H);
+}
+function dots(ctx,W,H,sp){ctx.fillStyle="#1a1a1a";for(let y=sp/2|0;y<H;y+=sp)for(let x=sp/2|0;x<W;x+=sp)ctx.fillRect(x,y,1,1)}
+
+/* crisp pixel text: render once, threshold alpha, cache */
+const TC=new Map();
+function tb(s,c){
+  const key=s+"|"+c;let b=TC.get(key);if(b)return b;
+  const cv=document.createElement("canvas"),g=cv.getContext("2d");
+  g.font=FONT;const w=Math.ceil(g.measureText(s).width)+2;
+  cv.width=Math.max(1,w);cv.height=11;g.font=FONT;g.textBaseline="alphabetic";g.fillStyle=c;g.fillText(s,1,8);
+  try{const d=g.getImageData(0,0,cv.width,11),a=d.data;for(let i=3;i<a.length;i+=4)a[i]=a[i]>100?255:0;g.putImageData(d,0,0)}catch(e){}
+  b={cv,w:w-2};TC.set(key,b);return b;
+}
+function tw(s){return tb(s,FG).w}
+function txt(ctx,s,x,y,align,color,bg){
+  const b=tb(s,color||FG);let lx=align==="center"?x-b.w/2:align==="right"?x-b.w:x;lx=Math.round(lx);
+  if(bg){ctx.fillStyle="#000";ctx.fillRect(lx-2,Math.round(y)-5,b.w+4,10)}
+  ctx.drawImage(b.cv,lx-1,Math.round(y)-5);
+}
+function labelAt(ctx,s,x,y,W,H,align,bg){
+  const w=tw(s);let lx=align==="center"?x-w/2:align==="right"?x-w:x;
+  lx=clamp(lx,3,W-w-3);txt(ctx,s,lx,clamp(y,6,H-6),"left",FG,bg);
+}
+
+/* ---------- spring grid ---------- */
+class Grid{
+  constructor(sp){this.sp=sp;this.n=0}
+  build(W,H){
+    const sp=this.sp;this.c=Math.ceil(W/sp)+3;this.r=Math.ceil(H/sp)+3;
+    const n=this.n=this.c*this.r;
+    this.bx=new Float32Array(n);this.by=new Float32Array(n);this.ox=new Float32Array(n);this.oy=new Float32Array(n);this.vx=new Float32Array(n);this.vy=new Float32Array(n);
+    const offx=Math.round((W-(this.c-3)*sp)/2),offy=Math.round((H-(this.r-3)*sp)/2);
+    for(let j=0;j<this.r;j++)for(let i=0;i<this.c;i++){const k=j*this.c+i;this.bx[k]=offx+(i-1)*sp;this.by[k]=offy+(j-1)*sp}
+  }
+  impulse(x,y,rad,str){for(let k=0;k<this.n;k++){const dx=this.bx[k]+this.ox[k]-x,dy=this.by[k]+this.oy[k]-y,d=Math.hypot(dx,dy);if(d<rad&&d>.01){const f=str*(1-d/rad);this.vx[k]+=dx/d*f;this.vy[k]+=dy/d*f}}}
+  step(){
+    const c=this.c,r=this.r,ox=this.ox,oy=this.oy,vx=this.vx,vy=this.vy;
+    for(let j=1;j<r-1;j++)for(let i=1;i<c-1;i++){const k=j*c+i;
+      const ax=(ox[k-1]+ox[k+1]+ox[k-c]+ox[k+c])*.25-ox[k],ay=(oy[k-1]+oy[k+1]+oy[k-c]+oy[k+c])*.25-oy[k];
+      vx[k]=(vx[k]-.05*ox[k]+.14*ax)*.88;vy[k]=(vy[k]-.05*oy[k]+.14*ay)*.88}
+    for(let k=0;k<this.n;k++){ox[k]+=vx[k];oy[k]+=vy[k]}
+  }
+  draw(ctx,minor,major){
+    const c=this.c,r=this.r;
+    for(const pass of [0,1]){
+      ctx.strokeStyle=pass?major:minor;ctx.lineWidth=1;ctx.beginPath();
+      for(let j=0;j<r;j++){if((j%4===0)!==!!pass)continue;for(let i=0;i<c;i++){const k=j*c+i,x=Math.round(this.bx[k]+this.ox[k])+.5,y=Math.round(this.by[k]+this.oy[k])+.5;i?ctx.lineTo(x,y):ctx.moveTo(x,y)}}
+      for(let i=0;i<c;i++){if((i%4===0)!==!!pass)continue;for(let j=0;j<r;j++){const k=j*c+i,x=Math.round(this.bx[k]+this.ox[k])+.5,y=Math.round(this.by[k]+this.oy[k])+.5;j?ctx.lineTo(x,y):ctx.moveTo(x,y)}}
+      ctx.stroke();
+    }
+  }
+}
+
+/* ---------- sparks + spawn rings ---------- */
+class FX{
+  constructor(){this.p=[];this.rings=[]}
+  burst(x,y,n,sp,life){life=life||32;for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,v=sp*rnd(.25,1);this.p.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,l:life*rnd(.5,1),m:life})}}
+  ring(x,y,max){this.rings.push({x,y,r:2,max,rot:Math.random()*Math.PI})}
+  step(){
+    for(const p of this.p){p.x+=p.vx;p.y+=p.vy;p.vx*=.92;p.vy*=.92;p.l--}
+    this.p=this.p.filter(p=>p.l>0);
+    for(const g of this.rings){g.r+=(g.max-g.r)*.12+.3;g.rot+=.05}
+    this.rings=this.rings.filter(g=>g.r<g.max-1);
+  }
+  draw(ctx){
+    ctx.lineWidth=1;
+    for(const p of this.p){const a=p.l/p.m;ctx.strokeStyle="rgba(244,244,244,"+a.toFixed(2)+")";ctx.beginPath();ctx.moveTo(Math.round(p.x)+.5,Math.round(p.y)+.5);ctx.lineTo(Math.round(p.x-p.vx*2)+.5,Math.round(p.y-p.vy*2)+.5);ctx.stroke()}
+    for(const g of this.rings){const a=1-g.r/g.max;ctx.strokeStyle="rgba(244,244,244,"+a.toFixed(2)+")";poly(ctx,g.x,g.y,g.r,4,g.rot);ctx.stroke()}
+  }
+}
+
+/* ---------- scene manager ---------- */
+const SCENES=[];
+function makeScene(cv,px,impl){
+  const ctx=cv.getContext("2d");
+  const sc={cv,ctx,px,impl,W:0,H:0,vis:true,drawn:false};
+  sc.resize=function(){
+    const r=cv.getBoundingClientRect();
+    const W=Math.max(16,Math.round(r.width/px)),H=Math.max(16,Math.round(r.height/px));
+    if(W!==sc.W||H!==sc.H){sc.W=cv.width=W;sc.H=cv.height=H;ctx.imageSmoothingEnabled=false;impl.resize(sc);sc.drawn=false}
+  };
+  SCENES.push(sc);
+  if("IntersectionObserver" in window)new IntersectionObserver(es=>es.forEach(e=>{sc.vis=e.isIntersecting})).observe(cv);
+  if("ResizeObserver" in window)new ResizeObserver(()=>sc.resize()).observe(cv);
+  sc.resize();
+  return sc;
+}
+let last=performance.now(),T=0;
+function frame(now){
+  const dt=Math.min(.05,(now-last)/1000);last=now;T+=dt;
+  for(const sc of SCENES){if(sc.vis||!sc.drawn){sc.impl.tick(sc,reduce?0:dt,T);sc.drawn=true}}
+  requestAnimationFrame(frame);
+}
+
+/* ================= HERO ================= */
+const hero={
+  grid:new Grid(10),fx:new FX(),ents:[],next:1.2,
+  resize(sc){
+    this.grid.build(sc.W,sc.H);
+    if(!this.ents.length){const kinds=[4,4,3,3,4,6,3,4];
+      for(let i=0;i<kinds.length;i++)this.ents.push({x:rnd(sc.W*.45,sc.W),y:rnd(0,sc.H),vx:rnd(-.3,.3),vy:rnd(-.3,.3),n:kinds[i],r:kinds[i]===4?rnd(3,6):rnd(3,5),rot:0,spin:rnd(-.06,.06),fill:i%3===0})}
+  },
+  tick(sc,dt){
+    const {ctx,W,H}=sc,g=this.grid,fx=this.fx;
+    if(dt>0){
+      for(const e of this.ents){
+        e.vx+=rnd(-.03,.03);e.vy+=rnd(-.03,.03);const s=Math.hypot(e.vx,e.vy);if(s>.45){e.vx*=.45/s;e.vy*=.45/s}
+        e.x+=e.vx;e.y+=e.vy;e.rot+=e.spin;
+        if(e.x<W*.08||e.x>W-8)e.vx*=-1;if(e.y<8||e.y>H-8)e.vy*=-1;
+        e.x=clamp(e.x,W*.08,W-8);e.y=clamp(e.y,8,H-8);
+        if(Math.random()<.04)g.impulse(e.x,e.y,14,.25);
+      }
+      this.next-=dt;
+      if(this.next<=0){const e=this.ents[Math.random()*this.ents.length|0];fx.burst(e.x,e.y,36,2.2);fx.ring(e.x,e.y,26);g.impulse(e.x,e.y,46,2.4);this.next=rnd(1.6,3)}
+      g.step();fx.step();
+    }
+    ctx.fillStyle="#000";ctx.fillRect(0,0,W,H);
+    g.draw(ctx,"#141414","#262626");
+    vignette(ctx,W,H,14);
+    for(const e of this.ents)glow(ctx,4,()=>{poly(ctx,e.x,e.y,e.r,e.n,e.rot);ctx.strokeStyle=FG;ctx.lineWidth=1;ctx.stroke();if(e.fill){ctx.fillStyle=FG;ctx.fill()}});
+    fx.draw(ctx);
+  }
+};
+const heroSc=makeScene($("#heroCv"),3,hero);
+let lastPtr=0;
+$(".hero").addEventListener("pointermove",ev=>{
+  if(reduce)return;const now=performance.now();if(now-lastPtr<40)return;lastPtr=now;
+  const r=heroSc.cv.getBoundingClientRect();hero.grid.impulse((ev.clientX-r.left)/3,(ev.clientY-r.top)/3,22,.7);
+});
+
+/* ================= FLOW ================= */
+const NODES={
+  h:{payer:[.06,.34,"PAYER","below"],h1:[.2,.34,"HOP","below"],h2:[.34,.34,"HOP","below"],mint:[.5,.34,"MINT","above"],h3:[.66,.34,"HOP","below"],h4:[.8,.34,"HOP","below"],payee:[.94,.34,"PAYEE","below"],
+     alice:[.28,.8,"ALICE","below"],bob:[.5,.8,"BOB","below"],carol:[.72,.8,"CAROL","below"]},
+  v:{payer:[.36,.05,"PAYER","left"],h1:[.36,.17,"HOP","left"],h2:[.36,.29,"HOP","left"],mint:[.36,.48,"MINT","left"],h3:[.36,.67,"HOP","left"],h4:[.36,.8,"HOP","left"],payee:[.36,.94,"PAYEE","left"],
+     alice:[.8,.3,"ALICE","below"],bob:[.8,.5,"BOB","below"],carol:[.8,.7,"CAROL","below"]}
+};
+const KIND={payer:"ship",payee:"ship",h1:"hop",h2:"hop",h3:"hop",h4:"hop",mint:"mint",alice:"wallet",bob:"wallet",carol:"wallet"};
+const ROUTE=[["payer","h1"],["h1","h2"],["h2","mint"],["mint","h3"],["h3","h4"],["h4","payee"]];
+const API=[["mint","alice"],["mint","bob"],["mint","carol"]];
+const BEARER=[["alice","bob"],["bob","carol"]];
+const ek=(a,b)=>a<b?a+"|"+b:b+"|"+a;
+
+function swapStep(a,b,n){
+  return {dur:4.4,act:[a,b,"mint"],move:{from:a,to:b,t0:.04,t1:.28,label:"TOKEN"},
+    packets:[{path:[b,"mint"],t0:.33,t1:.56,label:"SWAP REQ",kind:"msg"},{path:["mint",b],t0:.66,t1:.88,label:"BLIND SIG",kind:"msg"}],
+    events:[[.28,f=>f.hit(b,20,1,10)],[.56,f=>{f.hit("mint",48,2.8,46);f.ring("mint",34);f.flash("N"+n+" SPENT")}],[.88,f=>{f.hit(b,30,1.6,24);f.ring(b,20)}]]};
+}
+const STEPS=[
+  {dur:3.4,act:["alice","mint"],
+   packets:[{path:["alice","mint"],t0:.05,t1:.4,label:"H + AMOUNT",kind:"msg"},{path:["mint","alice"],t0:.55,t1:.9,label:"HOLD INVOICE",kind:"msg"}],
+   events:[[.4,f=>{f.hit("mint",26,1.4,14);f.ring("mint",20)}],[.9,f=>f.hit("alice",18,.8,8)]]},
+  {dur:3.8,act:["payer","h1","h2","mint"],
+   packets:[{path:["payer","h1","h2","mint"],t0:.04,t1:.74,label:"HTLC",kind:"htlc"}],
+   events:[[.74,f=>{f.hit("mint",44,-2.4,0);f.ring("mint",30);f.flash("ACCEPTED")}]]},
+  {dur:3.6,act:["alice","mint"],
+   packets:[{path:["alice","mint"],t0:.04,t1:.36,label:"C + PROOF",kind:"msg"},{path:["mint","alice"],t0:.54,t1:.86,label:"(U, V)",kind:"msg"}],
+   events:[[.36,f=>f.hit("mint",22,1,10)],[.45,f=>{f.ring("mint",24);f.flash("SIGN h")}],[.87,f=>{f.hit("alice",36,2,30);f.ring("alice",24)}]]},
+  swapStep("alice","bob",1),
+  swapStep("bob","carol",2),
+  {dur:6.2,act:["carol","mint","h3","h4","payee","h2","h1","payer"],move:{from:"carol",to:"mint",t0:.03,t1:.18,label:"P + PRES + INVOICE"},
+   packets:[{path:["mint","h3","h4","payee"],t0:.22,t1:.42,label:"PAYOUT",kind:"htlc"},{path:["payee","h4","h3","mint"],t0:.45,t1:.6,label:"P'",kind:"pre"},{path:["mint","h2","h1","payer"],t0:.64,t1:.84,label:"SETTLE P",kind:"pre"}],
+   events:[[.18,f=>{f.hit("mint",52,3,54);f.ring("mint",40);f.flash("N3 BURNED")}],[.42,f=>{f.hit("payee",24,1.2,14);f.ring("payee",18)}],[.6,f=>f.hit("mint",24,1,12)],
+           [.85,f=>{["payer","h1","h2","mint"].forEach(k=>{f.hit(k,40,2.2,30);f.ring(k,26)});f.flash("SETTLED")}]]}
+];
+const NAMES=["QUOTE","FUND","ISSUE","SWAP A>B","SWAP B>C","BURN"];
+const GAP=.6; // seconds between steps
+
+const HOLD_EV=[];
+STEPS.forEach((s,i)=>s.packets.forEach(pk=>{
+  if(pk.kind!=="htlc"&&pk.kind!=="pre")return;const n=pk.path.length-1;
+  for(let k=0;k<n;k++)HOLD_EV.push({key:ek(pk.path[k],pk.path[k+1]),time:i+pk.t0+(k+1)/n*(pk.t1-pk.t0),held:pk.kind==="htlc"});
+}));
+function isHeld(key,g){let st=false,lt=-1;for(const e of HOLD_EV)if(e.key===key&&e.time<=g&&e.time>lt){lt=e.time;st=e.held}return st}
+const T_OPEN=.4,T_HELD=1.74,T_SETTLED=5.85;
+
+const SIDE=[
+  {title:"Client fixes the hash",
+   body:"Alice picks a 32-byte preimage P and sends only H = SHA256(P) and the amount. The mint asks its LND node for a hold invoice on that hash. P stays local, so nothing the mint is paid can be settled by the mint alone.",
+   eq:"H = SHA256(P)\nPOST /v1/mint/quote/bolt11 {amount, H}\n→ AddHoldInvoice(H, amount)",
+   view:["s:9f2c…e41a","s:12,345 sat","s:derived from H","-","-","x","-"]},
+  {title:"Payer's HTLC is accepted and held",
+   body:"Any payer pays the BOLT11. Each hop forwards an HTLC locked to H. The mint's node reaches ACCEPTED and holds it: the sats are committed but nobody has received them, and the route's liquidity stays locked until settle, cancel or CLTV expiry.",
+   eq:"invoice(H).state = ACCEPTED\namt_paid ≥ amount\nP still unknown to the mint",
+   view:["s:9f2c…e41a","s:12,345 sat paid","s:derived from H","-","-","x","-"]},
+  {title:"Mint signs the whole claim",
+   body:"Alice commits to an owner secret and proves knowledge of it. Only after full acceptance does the mint sign, with a fresh k. One key covers every amount; the amount and H live inside h.",
+   eq:"h = SHA256(dom ‖ amt ‖ H) mod q\nC = s·G1,  u = k·G1\nv = k·[(x + y_h·h)·G1 + y_s·C]",
+   view:["s:9f2c…e41a","s:12,345 sat","s:signed into v","s:C = s·G1","-","x","-"]},
+  {title:"Alice to Bob, private swap",
+   body:"Alice hands Bob the bearer string. She still knows s, so Bob swaps at once: a rerandomized credential, the nullifier, a blinded commitment to h and a fresh C′. The mint checks one pairing and two Σ-proofs, records N₁ as spent and blind-signs. It never sees h, H or the amount.",
+   eq:"e(v″,G2) = e(u′, X2+κ_h)·e(U_s, Y_s2)\nN₁ = s·G_NULL  → spent\nV = V_raw − t·U  → σ(h, s′)",
+   view:["x","x","x","s:C′ fresh","s:N₁ → spent","x","-"]},
+  {title:"Bob to Carol, same protocol",
+   body:"New witnesses, same h. Bob's s′ is consumed and Carol holds s″. Neither swap touches Lightning: no routing fees, no new HTLCs. The original payment is still pending at the payer.",
+   eq:"N₂ = s′·G_NULL ≠ N₁\nh unchanged, never revealed\nLN payments so far: 1 (held)",
+   view:["x","x","x","s:C″ fresh","s:N₂ → spent","x","-"]},
+  {title:"Pay any invoice, then settle the hold",
+   body:"Carol sends P, a presentation with public h bound to her payout invoice, and the invoice, which can have any hash. The mint checks SHA256(P) against h, pays from its own liquidity, verifies the payout preimage, persists the receipt, then settles the hold with P. H links this burn to the issuance.",
+   eq:"h ?= SHA256(dom ‖ amt ‖ SHA256(P))\npay(invoice) → P′, SHA256(P′) = H′\npersist → SettleInvoice(P)",
+   view:["s:9f2c…e41a","s:12,345 sat","s:public","-","s:N₃ → burned","s:5d0e…a7b3","s:any hash"]}
+];
+const FIELDS=[["H","backing hash"],["AMT","amount"],["h","claim attr"],["C","owner commit"],["N","nullifier"],["P","preimage"],["INV","payout"]];
+
+const flow={
+  grid:new Grid(8),fx:new FX(),pos:{},vertical:false,step:0,t:0,mode:reduce?"paused":"loop",fired:new Set(),flashes:[],
+  resize(sc){
+    this.vertical=sc.W/sc.H<1;this.grid.build(sc.W,sc.H);
+    const L=NODES[this.vertical?"v":"h"];
+    for(const k in L)this.pos[k]={x:Math.round(L[k][0]*sc.W),y:Math.round(L[k][1]*sc.H),label:L[k][2],lp:L[k][3]};
+  },
+  hit(k,rad,str,n){const p=this.pos[k];this.grid.impulse(p.x,p.y,rad,str);if(n)this.fx.burst(p.x,p.y,n,1.8)},
+  ring(k,max){const p=this.pos[k];this.fx.ring(p.x,p.y,max)},
+  flash(s){this.flashes.push({s,l:1.2})},
+  go(i,mode){
+    this.step=(i+STEPS.length)%STEPS.length;this.fired=new Set();this.flashes=[];
+    if(mode)this.mode=mode;
+    this.t=reduce||this.mode==="paused"?1:0;
+    if(this.t===1)STEPS[this.step].events.forEach(e=>this.fired.add(e));
+    renderSide(this.step);
+  },
+  pointOn(path,s){const n=path.length-1,f=clamp(s)*n,k=Math.min(Math.floor(f),n-1),l=f-k,a=this.pos[path[k]],b=this.pos[path[k+1]];return {x:a.x+(b.x-a.x)*l,y:a.y+(b.y-a.y)*l}},
+  tokenAt(i,t){
+    if(i<2||(i===2&&t<.87))return null;
+    if(i===2)return {p:this.pos.alice};
+    const mv=STEPS[i].move;
+    if(t<mv.t0)return {p:this.pos[mv.from]};
+    if(t<mv.t1){const s=ease((t-mv.t0)/(mv.t1-mv.t0)),a=this.pos[mv.from],b=this.pos[mv.to];return {p:{x:a.x+(b.x-a.x)*s,y:a.y+(b.y-a.y)*s},label:mv.label}}
+    if(i===5)return null;
+    return {p:this.pos[mv.to]};
+  },
+  tick(sc,dt,time){
+    const S=STEPS[this.step];
+    if(dt>0){
+      if(this.mode!=="paused"||this.t<1){const before=this.t;this.t+=dt/S.dur;if(this.mode==="paused"&&before<1&&this.t>=1)this.t=1}
+      for(const e of S.events)if(!this.fired.has(e)&&this.t>=e[0]){this.fired.add(e);e[1](this)}
+      if(this.mode==="loop"&&this.t>1+GAP/S.dur)this.go(this.step+1);
+      else if(this.mode==="once"&&this.t>=1){this.t=1;this.mode="paused";syncPlay()}
+      this.grid.step();this.fx.step();
+      for(const f of this.flashes)f.l-=dt;this.flashes=this.flashes.filter(f=>f.l>0);
+    }
+    this.draw(sc,time);
+    const pf=clamp(this.t);pipEls.forEach((el,k)=>el.style.setProperty("--p",k===this.step?pf:0));
+  },
+  draw(sc,time){
+    const {ctx,W,H}=sc,P=this.pos,i=this.step,t=clamp(this.t),g=i+t,S=STEPS[i],V=this.vertical;
+    ctx.fillStyle="#000";ctx.fillRect(0,0,W,H);
+    this.grid.draw(ctx,"#121212","#202020");
+    vignette(ctx,W,H,10);
+    if(!V){txt(ctx,"L2 LIGHTNING",5,8,"left",MUTE);txt(ctx,"L3 ECASH",5,Math.round(H*.8)-20,"left",MUTE)}
+
+    for(const [a,b] of API)line(ctx,P[a].x,P[a].y,P[b].x,P[b].y,"#2c2c2c");
+    for(const [a,b] of BEARER){
+      if(V){const bx=P[a].x+11;line(ctx,P[a].x+7,P[a].y,bx,P[a].y,"#555");line(ctx,P[b].x+7,P[b].y,bx,P[b].y,"#555");line(ctx,bx,P[a].y,bx,P[b].y,"#555",[2,2])}
+      else line(ctx,P[a].x,P[a].y,P[b].x,P[b].y,"#555",[2,2]);
+    }
+    const heldKeys=new Set();
+    for(const [a,b] of ROUTE){
+      const held=isHeld(ek(a,b),g);
+      if(held){heldKeys.add(a).add(b);line(ctx,P[a].x,P[a].y,P[b].x,P[b].y,"#777");line(ctx,P[a].x,P[a].y,P[b].x,P[b].y,FG,[4,3],-time*14,true)}
+      else line(ctx,P[a].x,P[a].y,P[b].x,P[b].y,"#4a4a4a");
+    }
+
+    const status=g<T_OPEN?"IDLE":g<T_HELD?"OPEN":g<T_SETTLED?"HELD":"SETTLED";
+    const spent=g>=5.18?3:g>=4.56?2:g>=3.56?1:0;
+    const act=new Set(S.act);
+    for(const k in P){
+      const p=P[k],kind=KIND[k],on=act.has(k);
+      if(kind==="mint"){
+        const pulse=status==="HELD"?.5+.5*Math.sin(time*4):0;
+        pdia(ctx,p.x,p.y,9,"#000",true);
+        glow(ctx,5+pulse*4,()=>{ctx.strokeStyle=FG;ctx.lineWidth=1;poly(ctx,p.x+.5,p.y+.5,9,4,time*.8);ctx.stroke()});
+        if(status==="HELD"||status==="SETTLED")pdia(ctx,p.x,p.y,4,status==="HELD"?"rgba(244,244,244,"+(.55+.45*pulse).toFixed(2)+")":FG,true);
+        else pdia(ctx,p.x,p.y,4,FG,false);
+      }else if(kind==="hop"){
+        pcirc(ctx,p.x,p.y,3,"#000",true);
+        if(heldKeys.has(k))glow(ctx,3,()=>pcirc(ctx,p.x,p.y,3,FG,true));else pcirc(ctx,p.x,p.y,3,DIM,false);
+      }else if(kind==="ship"){
+        const c=on?FG:DIM,dir=V?"d":"r";
+        if(on)glow(ctx,4,()=>ptri(ctx,p.x,p.y,5,c,dir,"#000"));else ptri(ctx,p.x,p.y,5,c,dir,"#000");
+      }else{
+        rect(ctx,p.x-6,p.y-6,13,13,"#000");
+        if(on)glow(ctx,3,()=>orect(ctx,p.x-6,p.y-6,13,13,FG));else orect(ctx,p.x-6,p.y-6,13,13,DIM);
+      }
+      const col=on?FG:MUTE;
+      if(kind==="mint"){
+        const sc2=status==="IDLE"?MUTE:FG;
+        if(V){txt(ctx,"MINT",p.x-15,p.y-9,"right",FG);txt(ctx,status,p.x-15,p.y,"right",sc2)}
+        else{txt(ctx,"MINT",p.x,p.y-29,"center",FG);txt(ctx,status,p.x,p.y-20,"center",sc2)}
+      }else if(p.lp==="left")txt(ctx,p.label,p.x-10,p.y,"right",col);
+      else txt(ctx,p.label,p.x,p.y+(kind==="wallet"?14:11),"center",col);
+    }
+    { // CLTV bar + spent nullifiers
+      const m=P.mint,bw=24,bx=V?m.x-15-bw:m.x-bw/2,by=V?m.y+8:m.y-14;
+      if(status==="HELD"){
+        const rem=1-.6*clamp((g-T_HELD)/(T_SETTLED-T_HELD));
+        rect(ctx,bx,by,bw,2,"#333");rect(ctx,bx,by,Math.max(1,Math.round(bw*rem)),2,FG);
+        if(!V)txt(ctx,"CLTV",Math.round(bx)-4,by+1,"right",MUTE);
+      }
+      for(let n=0;n<spent;n++){const sx=V?m.x-17-n*5:m.x+13+n*5,sy=V?m.y+15:m.y+9;rect(ctx,sx-1,sy-1,3,3,FG)}
+    }
+    for(const pk of S.packets){
+      if(t<pk.t0||t>pk.t1)continue;
+      const s=(t-pk.t0)/(pk.t1-pk.t0);
+      for(let q=6;q>=1;q--){const sq=s-q*.022;if(sq<0)continue;const tp=this.pointOn(pk.path,sq);rect(ctx,tp.x,tp.y,1,1,"rgba(244,244,244,"+(.55-q*.08).toFixed(2)+")")}
+      const p=this.pointOn(pk.path,s);
+      glow(ctx,5,()=>{
+        if(pk.kind==="htlc")rect(ctx,p.x-1,p.y-1,3,3,FG);
+        else if(pk.kind==="pre")pdia(ctx,p.x,p.y,2,FG,false);
+        else rect(ctx,p.x-1,p.y-1,2,2,FG);
+      });
+      const onRoute=KIND[pk.path[0]]!=="wallet"&&KIND[pk.path[pk.path.length-1]]!=="wallet";
+      if(!onRoute&&(s<.1||s>.82))continue;
+      if(V)labelAt(ctx,pk.label,p.x+7,p.y,W,H,"left");
+      else if(onRoute)labelAt(ctx,pk.label,p.x,p.y-9,W,H,"center");
+      else if(p.x>P.mint.x+2)labelAt(ctx,pk.label,p.x-8,p.y,W,H,"right");
+      else labelAt(ctx,pk.label,p.x+8,p.y,W,H,"left");
+    }
+    const tk=this.tokenAt(i,t);
+    if(tk){
+      const p=tk.p;
+      glow(ctx,6,()=>{poly(ctx,p.x+.5,p.y+.5,3,4,time*3);ctx.fillStyle=FG;ctx.fill();poly(ctx,p.x+.5,p.y+.5,5.5,4,-time*2);ctx.strokeStyle=FG;ctx.stroke()});
+      if(tk.label){if(V)labelAt(ctx,tk.label,p.x-9,p.y,W,H,"right");else labelAt(ctx,tk.label,p.x,p.y-11,W,H,"center")}
+    }
+    this.fx.draw(ctx);
+    for(const f of this.flashes){
+      const m=P.mint;ctx.globalAlpha=clamp(f.l/.4);
+      labelAt(ctx,f.s,V?m.x+14:m.x+16,V?m.y+18:m.y+19,W,H,"left",true);ctx.globalAlpha=1;
+    }
+  }
+};
+
+const pipsEl=$("#pips"),pipEls=[];
+NAMES.forEach((n,k)=>{
+  const li=document.createElement("li"),b=document.createElement("button");
+  b.type="button";b.className="pip";b.innerHTML="<span>"+n+"</span>";b.setAttribute("aria-label","Step "+(k+1)+": "+n);
+  b.addEventListener("click",()=>{flow.go(k,flow.mode==="loop"?"loop":"once");syncPlay()});
+  li.appendChild(b);pipsEl.appendChild(li);pipEls.push(b);
+});
+const esc=s=>s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"})[c]);
+function renderSide(i){
+  const d=SIDE[i];
+  $("#sideLbl").textContent="STEP "+(i+1)+"/6 · "+NAMES[i];
+  $("#sideTitle").textContent=d.title;$("#sideBody").textContent=d.body;$("#sideEq").textContent=d.eq;
+  $("#sideView").innerHTML=FIELDS.map((f,k)=>{const v=d.view[k];
+    const cell=v==="-"?'<span class="na">·</span>':v==="x"?'<span class="off">hidden</span>':'<span class="on">'+esc(v.slice(2))+'</span>';
+    return '<li><span class="f">'+f[0]+'</span><span class="d">'+f[1]+'</span>'+cell+'</li>'}).join("");
+  pipEls.forEach((el,k)=>{if(k===i)el.setAttribute("aria-current","step");else el.removeAttribute("aria-current");el.classList.toggle("done",k<i)});
+}
+function syncPlay(){$("#bPlay").textContent=flow.mode==="loop"?"PAUSE":"PLAY"}
+$("#bPrev").addEventListener("click",()=>{flow.go(flow.step-1,flow.mode==="loop"?"loop":"once");syncPlay()});
+$("#bNext").addEventListener("click",()=>{flow.go(flow.step+1,flow.mode==="loop"?"loop":"once");syncPlay()});
+$("#bPlay").addEventListener("click",()=>{if(flow.mode==="loop")flow.mode="paused";else{flow.mode="loop";if(flow.t>=1)flow.go(flow.step+1,"loop")}syncPlay()});
+document.addEventListener("keydown",e=>{
+  const r=$("#flow").getBoundingClientRect();if(r.bottom<0||r.top>innerHeight)return;
+  if(e.key==="ArrowRight")$("#bNext").click();else if(e.key==="ArrowLeft")$("#bPrev").click();
+});
+makeScene($("#flowCv"),2,flow);
+flow.go(0);syncPlay();
+
+/* ================= TOKEN CARD ================= */
+const HEX="0123456789abcdef";
+const rhex=n=>{let s="";for(let i=0;i<n;i++)s+=HEX[Math.random()*16|0];return s};
+function scramble(el,final){
+  if(reduce){el.textContent=final;return}
+  const start=performance.now(),ms=560;
+  (function f(now){const k=clamp((now-start)/ms),n=Math.floor(final.length*k);let s=final.slice(0,n);
+    for(let i=n;i<final.length;i++){const c=final[i];s+=/[0-9a-f]/.test(c)?HEX[Math.random()*16|0]:c}
+    el.textContent=s;if(k<1)requestAnimationFrame(f)})(start);
+  const row=el.parentElement;row.classList.remove("flash");void row.offsetWidth;row.classList.add("flash");
+}
+const HOLD=["ALICE","BOB","CAROL","BURNED"];
+const chainEl=$("#tokChain");
+chainEl.innerHTML=HOLD.map((h,k)=>(k?'<span class="ar">─▶</span>':'')+'<span class="n" data-k="'+k+'">'+(h==="BURNED"?"BURN":h)+'</span>').join("");
+let tokIdx=-1,tokVis=true;
+function tokStep(){
+  tokIdx=(tokIdx+1)%HOLD.length;const h=HOLD[tokIdx];
+  $("#tok").classList.toggle("burned",h==="BURNED");
+  $("#tokPnote").textContent=h==="BURNED"?"SENT TO MINT":"FIXED · BEARER";
+  if(h!=="BURNED"){scramble($("#tS"),rhex(10)+"…"+rhex(4));scramble($("#tUV"),"u "+rhex(6)+"… v "+rhex(6)+"…");scramble($("#tN"),rhex(10)+"…"+rhex(4))}
+  chainEl.querySelectorAll(".n").forEach(el=>{const k=+el.dataset.k;el.classList.toggle("on",k===tokIdx);el.classList.toggle("past",k<tokIdx)});
+}
+tokStep();
+if(!reduce){
+  if("IntersectionObserver" in window)new IntersectionObserver(es=>es.forEach(e=>{tokVis=e.isIntersecting})).observe($("#tok"));
+  setInterval(()=>{if(tokVis)tokStep()},2600);
+}
+
+/* ================= MINI VIZ ================= */
+function mini(cv,period,rep,draw){
+  const impl={t:reduce?rep:0,fx:new FX(),st:{},
+    resize(sc){impl.st={}},
+    tick(sc,dt){
+      const prev=impl.t;impl.t+=dt;
+      const lt=impl.t%period,lp=prev%period,wrapped=Math.floor(impl.t/period)!==Math.floor(prev/period);
+      if(wrapped)impl.st={};
+      const cross=a=>dt>0&&(wrapped?a<=lt:(lp<a&&lt>=a));
+      if(dt>0)impl.fx.step();
+      const {ctx,W,H}=sc;ctx.fillStyle="#000";ctx.fillRect(0,0,W,H);dots(ctx,W,H,8);
+      draw(ctx,W,H,lt,impl,cross);
+      impl.fx.draw(ctx);
+    }};
+  return makeScene(cv,2,impl);
+}
+const blink=t=>Math.floor(t*3)%2===0;
+
+const VIZ={
+  /* classic ecash custody vs layer3 custody */
+  custody:[6.2,5.0,(ctx,W,H,t,S,cross)=>{
+    const x0=Math.round(Math.min(56,W*.24)),x1=W-8,y1=Math.round(H*.36),y2=Math.round(H*.76),run=4.8;
+    const p=clamp(t/run),cur=Math.round(lerp(x0,x1,p)),notch=x1-10;
+    txt(ctx,"ECASH",6,y1,"left",DIM);txt(ctx,"L3",6,y2,"left",FG);
+    txt(ctx,"MINT CUSTODY",x0,y1-10,"left",MUTE);txt(ctx,"HELD HTLC, NO CUSTODY",x0,y2-10,"left",MUTE);
+    rect(ctx,x0,y1,x1-x0,1,"#2a2a2a");line(ctx,x0,y2,x1,y2,"#2a2a2a");
+    if(cur>x0){halo(ctx,x0,y1-1,cur-x0,3,.12);rect(ctx,x0,y1-1,cur-x0,3,FG)}
+    line(ctx,x0,y2,Math.min(cur,notch),y2,"#8a8a8a",[2,2],-t*14);
+    if(cur>notch){halo(ctx,notch,y2-1,cur-notch,3,.2);rect(ctx,notch,y2-1,cur-notch,3,FG);txt(ctx,"BURN",x1,y2-10,"right",FG)}
+    if(cross(run*(notch-x0)/(x1-x0))){S.fx.burst(notch,y2,26,1.8);S.fx.ring(notch,y2,16)}
+    if(t<run)rect(ctx,cur,y1-5,1,y2-y1+10,"rgba(244,244,244,.35)");
+  }],
+  /* swaps hop without touching lightning */
+  zeroln:[5.4,2.6,(ctx,W,H,t,S,cross)=>{
+    const n=4,ys=Math.round(H*.38),xs=k=>Math.round(12+k*(W-24)/(n-1)),yl=Math.round(H*.8),T0=.3,HOP=1.1,MV=.65;
+    for(let k=0;k<n;k++)orect(ctx,xs(k)-4,ys-4,9,9,DIM);
+    let x,y,done=0;
+    if(t<T0){x=xs(0);y=ys}else{const i=Math.floor((t-T0)/HOP);
+      if(i>=n-1){x=xs(n-1);y=ys;done=n-1}else{const s=ease(clamp(((t-T0)-i*HOP)/MV));x=lerp(xs(i),xs(i+1),s);y=ys-Math.sin(s*Math.PI)*9;done=i+(s>=1?1:0)}}
+    for(let i=0;i<n-1;i++)if(cross(T0+i*HOP+MV)){S.fx.ring(xs(i+1),ys,14);S.fx.burst(xs(i+1),ys,10,1.2)}
+    glow(ctx,5,()=>pdia(ctx,x,y,3,FG,true));
+    const lx1=Math.round(W*.5);
+    line(ctx,6,yl,lx1,yl,"#777");line(ctx,6,yl,lx1,yl,FG,[4,3],-t*12,true);
+    txt(ctx,"1 HTLC HELD",6,yl-9,"left",MUTE);
+    txt(ctx,"SWAPS "+done,W-6,yl,"right",FG);txt(ctx,"LN FEES 0",W-6,yl-9,"right",MUTE);
+  }],
+  /* shell game: anonymity set */
+  shell:[6.6,.8,(ctx,W,H,t,S,cross)=>{
+    const N=5,y0=Math.round(H*.56),gap=Math.min(26,(W-28)/(N-1)),xs=k=>Math.round(W/2+(k-2)*gap);
+    if(!S.st.tok){S.st.tok=[];for(let k=0;k<N;k++)S.st.tok.push({slot:k,from:k,t0:-9,dir:1});S.st.mark=Math.random()*N|0;
+      S.st.pairs=[];for(let j=0;j<5;j++){const a=Math.random()*N|0;let b=(a+1+(Math.random()*(N-1)|0))%N;S.st.pairs.push([a,b])}}
+    const MV=.42;
+    S.st.pairs.forEach(([a,b],j)=>{if(cross(1.9+j*.5)){const ta=S.st.tok.find(o=>o.slot===a),tb2=S.st.tok.find(o=>o.slot===b);
+      ta.from=a;ta.slot=b;ta.t0=1.9+j*.5;ta.dir=1;tb2.from=b;tb2.slot=a;tb2.t0=1.9+j*.5;tb2.dir=-1}});
+    const owner=t<1.4||t>4.9;
+    txt(ctx,owner?"OWNER VIEW":"MINT VIEW",6,7,"left",owner?FG:DIM);
+    txt(ctx,owner?"KNOWS WHICH":"ALL ALIKE",W-6,7,"right",MUTE);
+    S.st.tok.forEach((o,k)=>{
+      const s=ease(clamp((t-o.t0)/MV));const x=lerp(xs(o.from),xs(o.slot),s),y=y0-Math.sin(s*Math.PI)*10*o.dir;
+      const marked=owner&&k===S.st.mark;
+      if(marked){halo(ctx,x-4,y-4,9,9,.2);rect(ctx,x-4,y-4,9,9,FG)}else{rect(ctx,x-4,y-4,9,9,"#000");orect(ctx,x-4,y-4,9,9,owner?MUTE:DIM)}
+    });
+    if(cross(4.9)){const o=S.st.tok[S.st.mark];S.fx.ring(xs(o.slot),y0,16);S.fx.burst(xs(o.slot),y0,12,1.3)}
+    if(!owner)rect(ctx,6,H-7,Math.round((W-12)*clamp((t-1.4)/3.5)),1,MUTE);
+  }],
+  /* two rerandomized presentations, one nullifier */
+  nullifier:[5,2.2,(ctx,W,H,t,S,cross)=>{
+    const sx=Math.round(W*.14),mx=Math.round(W*.8),y=Math.round(H*.55);
+    glow(ctx,4,()=>{poly(ctx,sx+.5,y+.5,4,4,t*2);ctx.strokeStyle=FG;ctx.stroke()});
+    txt(ctx,"1 TOKEN",sx,y-14,"center",MUTE);
+    pdia(ctx,mx,y,8,"#000",true);glow(ctx,4,()=>pdia(ctx,mx,y,8,FG,false));
+    txt(ctx,"SPENT SET",mx,y-15,"center",MUTE);
+    const A=[.4,1.3],B=[.65,1.55];
+    [[A,-1,"r"],[B,1,"d"]].forEach(([w,dir,shape])=>{
+      if(t<w[0]||t>w[1])return;const s=(t-w[0])/(w[1]-w[0]);
+      const x=lerp(sx+6,mx-9,s),yy=y+dir*Math.sin(s*Math.PI)*12;
+      glow(ctx,4,()=>shape==="r"?rect(ctx,x-1,yy-1,3,3,FG):pdia(ctx,x,yy,2,FG,false));
+    });
+    if(cross(1.3)){S.fx.ring(mx,y,18);S.st.n=1}
+    if(cross(1.55)){S.fx.burst(mx-9,y,34,2.2);S.st.rej=1}
+    if(S.st.n||t>1.3)rect(ctx,mx-1,y+12,3,3,FG);
+    if(t>1.3&&t<2.6)txt(ctx,"N OK",mx,y+21,"center",FG);
+    if(t>=2.6&&t<4.6)txt(ctx,"409 SAME N",mx,y+21,"center",FG,true);
+    txt(ctx,"REROLLED X2",Math.round((sx+mx)/2),H-5,"center",MUTE);
+  }],
+  /* fixed-base forgery bounces off fresh k */
+  forgery:[4.5,1.3,(ctx,W,H,t,S,cross)=>{
+    const ax=Math.round(W*.13),cx=Math.round(W*.7),y=Math.round(H*.55),R=13;
+    ptri(ctx,ax,y,5,FG,"r","#000");txt(ctx,"SHIFT h",ax,y-14,"center",MUTE);
+    glow(ctx,4+(S.st.hitT!==undefined&&t-S.st.hitT<.3?6:0),()=>{poly(ctx,cx+.5,y+.5,R,8,t*.9);ctx.strokeStyle=FG;ctx.stroke()});
+    pdia(ctx,cx,y,4,FG,true);
+    txt(ctx,"FRESH k",cx,H-6,"center",MUTE);
+    [.4,1.9,3.4].forEach(t0=>{
+      const t1=t0+.8;
+      if(t>=t0&&t<t1){const s=(t-t0)/.8,x=lerp(ax+7,cx-R,s);for(let q=0;q<5;q++)rect(ctx,x-q*3,y,1,1,"rgba(244,244,244,"+(1-q*.2)+")");glow(ctx,4,()=>rect(ctx,x-1,y-1,3,3,FG))}
+      if(cross(t1)){S.fx.burst(cx-R,y,22,1.8);S.fx.ring(cx,y,R+8);S.st.hitT=t1}
+    });
+    if(S.st.hitT!==undefined&&t-S.st.hitT<.9)txt(ctx,"CDH",cx,y-R-7,"center",FG,true);
+  }],
+  /* payout hash independent of backing hash */
+  anyinv:[5.4,2.3,(ctx,W,H,t,S,cross)=>{
+    const lx=8,rx=W-8,mx=Math.round(W/2),y=Math.round(H*.56);
+    const settleS=clamp((t-2.7)/.7),settleX=lerp(mx,lx,settleS);
+    if(t<2.7){line(ctx,lx,y,mx,y,"#777");line(ctx,lx,y,mx,y,FG,[4,3],-t*12,true)}
+    else{line(ctx,settleX,y,mx,y,"#3a3a3a");if(settleS<1){line(ctx,lx,y,settleX,y,"#777");line(ctx,lx,y,settleX,y,FG,[4,3],-t*12,true)}}
+    line(ctx,mx,y,rx,y,"#3a3a3a");
+    ptri(ctx,lx,y,4,DIM,"r","#000");ptri(ctx,rx,y,4,DIM,"r","#000");
+    pdia(ctx,mx,y,6,"#000",true);glow(ctx,4,()=>pdia(ctx,mx,y,6,FG,false));
+    txt(ctx,"H 9F2C",lx,y-12,"left",FG);txt(ctx,"H' 07AB",rx,y-12,"right",FG);
+    if(t>=.6&&t<1.5){const x=lerp(mx+7,rx-5,(t-.6)/.9);glow(ctx,4,()=>rect(ctx,x-1,y-1,3,3,FG))}
+    if(cross(1.5)){S.fx.burst(rx,y,18,1.5);S.fx.ring(rx,y,14)}
+    if(t>=1.7&&t<2.4){const x=lerp(rx-5,mx+7,(t-1.7)/.7);glow(ctx,4,()=>pdia(ctx,x,y,2,FG,false))}
+    if(t>=2.7&&t<3.4)glow(ctx,4,()=>pdia(ctx,settleX,y,2,FG,false));
+    if(cross(3.4)){S.fx.burst(lx,y,18,1.5);S.fx.ring(lx,y,14)}
+    txt(ctx,t>3.4?"BOTH SETTLED":t>1.5?"PAID H'":"HOLD H",mx,H-6,"center",t>3.4?FG:MUTE);
+  }],
+  /* burn outbox survives a crash without double payout */
+  outbox:[7.4,5.6,(ctx,W,H,t,S,cross)=>{
+    const steps=["LOCK N","PAY","SAVE","SETTLE"],xs=k=>Math.round(W*(k+.5)/4),y=Math.round(H*.5);
+    const at=[.3,1.0,null,null],crash=1.7,restart=2.7;
+    let reached=-1;
+    if(t>=.3)reached=0;if(t>=1.0)reached=1;
+    const lookup=t>=3.0,save=t>=3.7,settle=t>=4.4;if(save)reached=2;if(settle)reached=3;
+    const down=t>=crash&&t<restart;
+    line(ctx,xs(0),y,xs(3),y,"#2e2e2e");
+    if(reached>0&&!down)line(ctx,xs(0),y,xs(reached),y,FG,null,0,true);
+    else if(down)line(ctx,xs(0),y,xs(1),y,"#666");
+    steps.forEach((s,k)=>{
+      const on=k<=reached;rect(ctx,xs(k)-4,y-4,9,9,"#000");
+      if(on&&!down){halo(ctx,xs(k)-4,y-4,9,9,.18);rect(ctx,xs(k)-4,y-4,9,9,FG)}else if(on)rect(ctx,xs(k)-4,y-4,9,9,"#666");else orect(ctx,xs(k)-4,y-4,9,9,DIM);
+      txt(ctx,s,xs(k),y+14,"center",on?FG:MUTE);
+    });
+    if(cross(.3)||cross(1.0)||cross(3.7)||cross(4.4)){const k=t<.6?0:t<1.3?1:t<4?2:3;S.fx.ring(xs(k),y,14)}
+    if(cross(crash)){S.fx.burst(W/2,y,60,3);S.fx.ring(W/2,y,40)}
+    if(t>=crash&&t<crash+.12){ctx.fillStyle="rgba(244,244,244,.85)";ctx.fillRect(0,0,W,H)}
+    txt(ctx,"BURN OUTBOX",6,7,"left",MUTE);
+    txt(ctx,"PAYOUTS 1",W-6,7,"right",FG);
+    if(down&&blink(t))txt(ctx,"CRASH",W/2,y-13,"center",FG,true);
+    if(t>=restart&&t<3.0)txt(ctx,"RESTART",W/2,y-13,"center",DIM,true);
+    if(lookup&&t<3.7)txt(ctx,"FOUND, NOT REPAID",xs(1),y-13,"center",FG,true);
+  }],
+  /* CLTV clock runs out; dead token still swaps */
+  expiry:[11.4,7.6,(ctx,W,H,t,S,cross)=>{
+    const BL=80,CN=68,DS=74,RUN=9,b=Math.min(BL,t/RUN*BL),dead=b>=CN;
+    const x=k=>6+k*(W-12)/BL,y0=Math.round(H*.52),ch=8,cw=(W-12)/BL;
+    if(cross(RUN*CN/BL)){for(let k=CN;k<BL;k+=2)S.fx.burst(x(k),y0+3,2,1.4,22);S.fx.burst(x(CN),y0,30,2.2);S.fx.ring(x(CN),y0+3,22)}
+    if(cross(RUN*DS/BL))S.fx.ring(x(DS),y0+3,14);
+    txt(ctx,"CLTV "+BL,6,7,"left",MUTE);txt(ctx,"BLOCK +"+String(Math.floor(b)).padStart(2,"0"),W-6,7,"right",FG);
+    for(let k=0;k<BL;k++){
+      const xx=Math.round(x(k)),w=Math.max(1,Math.round(x(k+1))-xx-(cw>=2?1:0));
+      if(dead){if(k<b)rect(ctx,xx,y0,w,ch,k<CN?"#4a4a4a":"#262626");else orect(ctx,xx,y0,w,ch,"#222")}
+      else if(k<b)rect(ctx,xx,y0,w,ch,FG);
+      else if(k>=CN){ctx.fillStyle="#333";for(let yy=0;yy<ch;yy++)for(let q=0;q<w;q++)if((xx+q+yy)%2===0)ctx.fillRect(xx+q,y0+yy,1,1)}
+      else rect(ctx,xx,y0,w,ch,"#222");
+    }
+    const m0=Math.round(x(CN)),m1=Math.round(x(BL))-1;
+    rect(ctx,m0,y0+ch+3,m1-m0,1,MUTE);rect(ctx,m0,y0+ch+1,1,3,MUTE);rect(ctx,m1,y0+ch+1,1,3,MUTE);
+    txt(ctx,"CANCEL",m1,y0+ch+11,"right",dead?FG:MUTE);
+    [0,16,32,48].forEach(k=>{if(k<=b)ptri(ctx,Math.round(x(k))+1,y0-5,2,DIM,"d",DIM)});
+    if(dead){const cx=Math.round(x(CN))+1;for(let q=-2;q<=2;q++){rect(ctx,cx+q,y0-5+q,1,1,FG);rect(ctx,cx+q,y0-5-q,1,1,FG)}}
+    if(b>=DS){ptri(ctx,Math.round(x(DS))+1,y0-5,2,FG,"d","#000");if(blink(t))txt(ctx,"SWAP OK?!",W-6,y0-14,"right",FG,true)}
+    const cap=$("#expCap");let msg;
+    if(b<CN){msg=["ALICE","BOB","CAROL","DAVE"][Math.min(3,Math.floor(b/16))]+" · HTLC HELD · "+(CN-Math.floor(b))+" BLOCKS LEFT"}
+    else if(b<DS)msg="HOLD CANCELED · <span class=\"inv\">PAYER REFUNDED</span> · SIG STILL VERIFIES";
+    else msg="DAVE TO ERIN SWAP ACCEPTED · <span class=\"inv\">NO BACKING</span>";
+    if(cap.dataset.m!==msg){cap.dataset.m=msg;cap.innerHTML=msg}
+  }],
+  /* HTLC slots on a hop fill up */
+  jam:[7.2,4.6,(ctx,W,H,t,S,cross)=>{
+    const C=16,R=4,cs=Math.max(4,Math.min(Math.floor((W*.58)/C),Math.floor((H-24)/R))),gx=6,gy=Math.round((H-R*cs)/2)+3,gx1=gx+C*cs;
+    const FILL=4.2,f=Math.min(C*R,Math.floor(t/FILL*C*R));
+    for(let k=0;k<C*R;k++){const cx=gx+(k%C)*cs,cy=gy+Math.floor(k/C)*cs;
+      if(k<f){rect(ctx,cx,cy,cs-1,cs-1,FG)}else orect(ctx,cx,cy,cs-1,cs-1,"#2e2e2e")}
+    if(f>0&&f<C*R){const k=f-1;halo(ctx,gx+(k%C)*cs,gy+Math.floor(k/C)*cs,cs-1,cs-1,.3)}
+    txt(ctx,"HOP 483 SLOTS",gx,7,"left",MUTE);
+    const tx=Math.max(gx1+8,W-6);
+    txt(ctx,String(Math.round(f/(C*R)*483)).padStart(3,"0")+"/483",W-6,gy+4,"right",FG);
+    txt(ctx,"HELD",W-6,gy+14,"right",MUTE);
+    const py=gy+R*cs-4;
+    if(t>=4.5&&t<5.2){const x=lerp(W-6,gx1+3,(t-4.5)/.7);glow(ctx,4,()=>rect(ctx,x-1,py-1,3,3,FG))}
+    if(cross(5.2)){S.fx.burst(gx1+2,py,30,2);S.fx.ring(gx1+2,py,16)}
+    if(t>=5.2&&t<5.8){const x=lerp(gx1+3,W-6,(t-5.2)/.6);rect(ctx,x-1,py-1,3,3,DIM)}
+    if(t>=5.2&&t<7.2&&blink(t))txt(ctx,"JAMMED",W-6,py,"right",FG,true);
+  }],
+  /* mint has P before the payout lands */
+  trust:[6.6,3.4,(ctx,W,H,t,S,cross)=>{
+    const lx=10,rx=W-10,mx=Math.round(W*.46),y=Math.round(H*.6);
+    line(ctx,lx,y,rx,y,"#2e2e2e");
+    orect(ctx,lx-4,y-4,9,9,DIM);ptri(ctx,rx,y,4,DIM,"r","#000");
+    const custody=t>=1.0&&t<5.3;
+    pdia(ctx,mx,y,7,"#000",true);
+    glow(ctx,custody?7:4,()=>pdia(ctx,mx,y,7,FG,custody));
+    txt(ctx,"CAROL",lx-4,y+13,"left",MUTE);txt(ctx,"PAYEE",rx+4,y+13,"right",MUTE);txt(ctx,"MINT",mx,y+13,"center",MUTE);
+    if(t>=.2&&t<1.0){const x=lerp(lx+5,mx-8,(t-.2)/.8);glow(ctx,4,()=>pdia(ctx,x,y,2,FG,false));txt(ctx,"P",x,y-9,"center",FG)}
+    if(cross(1.0)){S.fx.burst(mx,y,30,2);S.fx.ring(mx,y,20)}
+    if(t>=1.0&&t<2.6)txt(ctx,"SETTLES HOLD",mx,y-14,"center",FG,true);
+    const half=lerp(mx+8,rx-5,.5);
+    let px=null;
+    if(t>=1.6&&t<3.0)px=lerp(mx+8,half,(t-1.6)/1.4);else if(t>=3.0&&t<4.7)px=half;else if(t>=4.7&&t<5.3)px=lerp(half,rx-5,(t-4.7)/.6);
+    if(px!==null){glow(ctx,4,()=>rect(ctx,px-1,y-1,3,3,FG));if(t>=3.0&&t<4.7&&blink(t))txt(ctx,"?",px,y-9,"center",FG,true)}
+    if(cross(5.3)){S.fx.burst(rx,y,18,1.5);S.fx.ring(rx,y,14)}
+    const bw=Math.round((W-12)*clamp((t-1.0)/4.3));
+    txt(ctx,"TRUST WINDOW",6,7,"left",custody?FG:MUTE);
+    rect(ctx,6,14,W-12,1,"#2a2a2a");if(t>=1.0)rect(ctx,6,13,bw,3,custody?FG:"#555");
+  }],
+  /* issuance and burn share H */
+  linked:[6.8,4.8,(ctx,W,H,t,S,cross)=>{
+    const ix=Math.round(W*.1),bx=Math.round(W*.9),y=Math.round(H*.68),f0=Math.round(W*.3),f1=Math.round(W*.7);
+    for(let yy=y-9;yy<=y+9;yy++)for(let xx=f0;xx<=f1;xx++){const r=Math.sin(xx*12.9898+yy*78.233+Math.floor(t*10)*3.1)*43758.5;if(r-Math.floor(r)<.22)rect(ctx,xx,yy,1,1,"#3a3a3a")}
+    txt(ctx,"SWAPS",(f0+f1)/2,y+16,"center",MUTE);
+    orect(ctx,ix-4,y-4,9,9,FG);orect(ctx,bx-4,y-4,9,9,FG);
+    txt(ctx,"ISSUE",ix-4,y+16,"left",MUTE);txt(ctx,"BURN",bx+4,y+16,"right",MUTE);
+    txt(ctx,"H",ix,y-11,"center",FG);
+    if(t>=.3&&t<3.0){const s=(t-.3)/2.7,x=lerp(ix+6,bx-6,s),inFog=x>f0-2&&x<f1+2;
+      if(!inFog){glow(ctx,4,()=>pdia(ctx,x,y,2,FG,true));txt(ctx,"H",x,y-9,"center",FG)}
+      else if(Math.random()<.3)S.fx.burst(x,y+rnd(-6,6),1,.8,10)}
+    if(t>=3.0)txt(ctx,"H",bx,y-11,"center",FG);
+    if(cross(3.0)){S.fx.ring(bx,y,16);S.fx.burst(bx,y,14,1.4)}
+    if(t>=3.2){const s=clamp((t-3.2)/1),n=60,top=8,a0=y-16;
+      for(let k=0;k<=n*s;k++){const u=k/n,xx=lerp(ix,bx,u),yy=a0-(a0-top)*4*u*(1-u);if(k%3!==2)rect(ctx,xx,yy,1,1,FG)}
+      if(s>=1){txt(ctx,"SAME H",W/2,top+11,"center",FG,true)}}
+    if(cross(4.2)){S.fx.ring(ix,y,14);S.fx.ring(bx,y,14)}
+  }],
+  /* no change: token must match invoice */
+  whole:[6.6,4.3,(ctx,W,H,t,S,cross)=>{
+    const tw2=Math.round(Math.min(64,W*.3)),th=9,y=Math.round(H*.6),sx0=8,slotR=W-10;
+    const phaseB=t>=3.2,sw=phaseB?tw2:Math.round(tw2*.66),slotL=slotR-sw;
+    let x=sx0,gone=false;
+    if(!phaseB){if(t>=.4&&t<1.3)x=lerp(sx0,slotL,ease((t-.4)/.9));else if(t>=1.3&&t<1.9)x=lerp(slotL,sx0,ease((t-1.3)/.6));}
+    else{if(t>=3.5&&t<4.3)x=lerp(sx0,slotL,ease((t-3.5)/.8));else if(t>=4.3){x=slotL;gone=t>4.7}}
+    // slot bracket
+    rect(ctx,slotL-1,y+th+1,sw+2,1,DIM);rect(ctx,slotL-1,y-2,1,th+4,DIM);rect(ctx,slotR,y-2,1,th+4,DIM);
+    txt(ctx,phaseB?"INV 12345":"INV 10000",slotR,y-12,"right",phaseB?FG:DIM);
+    if(!gone){halo(ctx,x,y,tw2,th,.14);rect(ctx,x,y,tw2,th,FG);txt(ctx,"12345",x,y-12,"left",FG)}
+    if(cross(1.3)){S.fx.burst(slotL,y+4,26,1.8);S.fx.ring(slotL,y+4,14)}
+    if(t>=1.3&&t<3.0&&blink(t))txt(ctx,"NO CHANGE",W/2,H-6,"center",FG,true);
+    if(cross(4.3)){S.fx.burst(slotL+tw2/2,y+4,34,2.2);S.fx.ring(slotL+tw2/2,y+4,22)}
+    if(t>=4.3)txt(ctx,"EXACT ONLY",W/2,H-6,"center",FG);
+  }],
+  /* tests pass, audit pending */
+  proto:[6,5,(ctx,W,H,t,S,cross)=>{
+    const C=16,R=4,cs=Math.max(4,Math.min(Math.floor((W*.55)/C),Math.floor((H-24)/R))),gx=6,gy=Math.round((H-R*cs)/2)+3;
+    const f=Math.min(64,Math.floor(t/2.2*64));
+    for(let k=0;k<64;k++){const cx=gx+(k%C)*cs,cy=gy+Math.floor(k/C)*cs;if(k<f)rect(ctx,cx,cy,cs-1,cs-1,FG);else orect(ctx,cx,cy,cs-1,cs-1,"#2e2e2e")}
+    if(cross(2.2))S.fx.ring(gx+C*cs/2,gy+R*cs/2,30);
+    txt(ctx,"MAKE TEST",gx,7,"left",MUTE);
+    txt(ctx,String(f).padStart(2,"0")+"/64",W-6,gy+4,"right",FG);
+    txt(ctx,"AUDIT",W-6,gy+15,"right",MUTE);
+    if(t>2.2){txt(ctx,"NONE",W-6,gy+25,"right",FG);if(blink(t))rect(ctx,W-6-tw("NONE")-6,gy+22,4,6,FG)}
+  }]
+};
+document.querySelectorAll("canvas.viz").forEach(cv=>{const v=VIZ[cv.dataset.viz];if(v)mini(cv,v[0],v[1],v[2])});
+
+/* go */
+const kick=()=>{TC.clear();SCENES.forEach(s=>{s.drawn=false;s.resize()})};
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(kick);
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
