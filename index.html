@@ -66,7 +66,7 @@ h1 .cur{display:inline-block;width:.5em;height:.78em;background:var(--fg);vertic
 .stack .sc{overflow-x:auto;padding:0 20px 14px}
 .stack pre{font-size:12.5px;line-height:2;color:var(--dim)}
 .stack b{color:var(--fg);font-weight:500}
-.stack .k{font-family:var(--display);color:var(--bg);background:var(--fg);padding:0 5px;margin-right:12px}
+.stack .k{display:inline-block;width:2.4em;text-align:center;font-family:var(--display);color:var(--bg);background:var(--fg);margin-right:12px}
 
 /* sections */
 section{padding-block:80px 0}
@@ -247,9 +247,9 @@ footer{margin-top:88px;border-top:1px solid var(--line);padding-block:20px 40px;
     </div>
     <div class="box stack">
       <span class="lbl">STACK</span>
-      <div class="sc"><pre><span class="k">L3</span><b>PS credential</b>   alice ─▶ bob ─▶ carol      private swaps, no LN traffic
-<span class="k">L2</span><b>held HTLC    </b>   payer ═▶ hops ═▶ mint      ACCEPTED, unsettled, P unknown
-<span class="k">L1</span><b>bitcoin      </b>   channel outputs            CLTV bounds how long it can hold</pre></div>
+      <div class="sc"><pre><span class="k">L3</span><b>ecash    </b>   alice ─▶ bob ─▶ carol      PS credential, private swaps
+<span class="k">L2</span><b>lightning</b>   payer ═▶ hops ═▶ mint      HTLC held, unsettled, P unknown
+<span class="k">L1</span><b>onchain  </b>   channel outputs            CLTV bounds how long it can hold</pre></div>
     </div>
   </div>
 </header>
